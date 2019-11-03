@@ -2,6 +2,9 @@
 
 namespace IspApi;
 
+use Exception;
+use function http_build_query;
+use IspApi\Format\FormatInterface;
 use IspApi\Func\FuncInterface;
 use IspApi\HttpClient\HttpClientInterface;
 use IspApi\HttpClient\HttpClientParams;
@@ -14,6 +17,8 @@ use IspApi\Credentials\CredentialsInterface;
  */
 class ispManager
 {
+    const DEFAULT_HEADER = ["Content-type: application/x-www-form-urlencoded\r\n"];
+
     /**
      * @var ServerInterface
      */
@@ -30,9 +35,9 @@ class ispManager
     private $httpClient;
 
     /**
-     * @var string
+     * @var FormatInterface
      */
-    private $format = 'json';
+    private $format;
 
     /**
      * @var FuncInterface
@@ -45,14 +50,22 @@ class ispManager
     private $url;
 
     /**
-     * @var array
+     * @var UrlParts
      */
-    private $urlParts = [];
+    private $urlParts;
 
     /**
      * @var
      */
     private $data;
+
+    /**
+     * ispManager constructor.
+     */
+    public function __construct()
+    {
+        $this->urlParts = new UrlParts();
+    }
 
     /**
      * @param ServerInterface $server
@@ -87,10 +100,11 @@ class ispManager
     }
 
     /**
-     * @param string $format
+     * @param FormatInterface $format
+     *
      * @return ispManager
      */
-    public function setFormat(string $format): self
+    public function setFormat(FormatInterface $format): self
     {
         $this->format = $format;
         return $this;
@@ -117,12 +131,25 @@ class ispManager
     }
 
     /**
-     * @return array
-     * @throws \Exception
+     * @return mixed
+     * @throws Exception
      */
-    public function execute(): array
+    public function execute()
     {
-        return $this->httpClient->setParams($this->getHttpClientParams())->get();
+        $data = $this->httpClient->setParams($this->getHttpClientParams())->get();
+        return $this->format->setData($data)->getOut();
+    }
+
+    /**
+     * @return HttpClientParams
+     */
+    public function getHttpClientParams(): HttpClientParams
+    {
+        $this->buildUrl();
+        $method = $this->func->getIsSaveAction() ? HttpClientParams::HTTP_METHOD_POST : HttpClientParams::HTTP_METHOD_GET;
+
+        $header = self::DEFAULT_HEADER;
+        return new HttpClientParams($this->url, $method, $header);
     }
 
     /**
@@ -135,7 +162,19 @@ class ispManager
         $this->prepareUrlUser();
         $this->prepareUrlFormat();
         $this->prepareUrlFunc();
-        $this->url .= \http_build_query($this->urlParts);
+        $this->prepareUrlAdditional();
+        $this->url .= http_build_query($this->urlParts->toArray());
+        return $this;
+    }
+
+    /**
+     * @return self
+     */
+    private function prepareUrlAdditional(): self
+    {
+        if ($this->func->getAdditional()) {
+            $this->urlParts = array_merge($this->urlParts->toArray(), $this->func->getAdditional());
+        }
         return $this;
     }
 
@@ -157,7 +196,7 @@ class ispManager
      */
     private function prepareUrlUser(): self
     {
-        $this->urlParts['authinfo'] = $this->credentials->getLogin() . ':' . $this->credentials->getPassword();
+        $this->urlParts->setAuthinfo($this->credentials->getLogin() . ':' . $this->credentials->getPassword());
         return $this;
     }
 
@@ -166,7 +205,7 @@ class ispManager
      */
     private function prepareUrlFormat(): self
     {
-        $this->urlParts['out'] = $this->format;
+        $this->urlParts->setOut($this->format->getFormat());
         return $this;
     }
 
@@ -175,29 +214,13 @@ class ispManager
      */
     private function prepareUrlFunc(): self
     {
-        $this->urlParts['func'] = $this->func->getFunc();
+        $this->urlParts->setFunc($this->func->getFunc());
         if ($this->func->getElid()) {
-            $this->urlParts['elid'] = $this->func->getElid();
+            $this->urlParts->setElid($this->func->getElid());
         }
         if ($this->func->getPlid()) {
-            $this->urlParts['plid'] = $this->func->getPlid();
+            $this->urlParts->setPlid($this->func->getPlid());
         }
         return $this;
     }
-
-    /**
-     * @return HttpClientParams
-     */
-    public function getHttpClientParams(): HttpClientParams
-    {
-        $this->buildUrl();
-        $method = $this->func->isSaveAction() ? HttpClientParams::HTTP_METHOD_POST : HttpClientParams::HTTP_METHOD_GET;
-        $content = null;
-        if ($this->func->getAdditional()) {
-            $content = array_merge($this->urlParts, $this->func->getAdditional());
-        }
-        $header = ["Content-type: application/x-www-form-urlencoded\r\n"];
-        return new HttpClientParams($this->url, $method, $header, $content);
-    }
-
 }

@@ -19,7 +19,8 @@ include 'vendor/autoload.php';
 
 $server = new \IspApi\Server\Server('server', 1500);
 $credentials = new \IspApi\Credentials\Credentials('user', 'password');
-$client = new \IspApi\HttpClient\StreamClient(); // тут может быть любой ваш http клиент
+$format = new \IspApi\Format\JsonFormat();
+$client = new \IspApi\HttpClient\CurlClient(); // тут может быть любой ваш http клиент
 
 ```
 
@@ -27,12 +28,12 @@ $client = new \IspApi\HttpClient\StreamClient(); // тут может быть �
 
 ###### Подготовка к получению списка доменов
 ```php
-$getDomainList = new \IspApi\Func\Domain\GetList();
+$getDomainList = new \IspApi\Func\Dns\GetList();
 ```
 
 ###### Подготовка к удалению домена
 ```php
-$deleteDomain = new \IspApi\Func\Domain\Delete('domain.ru');
+$deleteDomain = new \IspApi\Func\Dns\Delete('domain.ru');
 ```
 
 ###### Подготовка к добавлению домена
@@ -53,17 +54,17 @@ $addDomain->setAdditional([
 
 ###### Подготовка к получению списка записей по выбранному домену
 ```php
-$listEntriesByDomain = new \IspApi\Func\Domain\Record\GetList('domain.ru');
+$listEntriesByDomain = new \IspApi\Func\Dns\Record\GetList('domain.ru');
 ```
 
 ###### Подготовка к удалению выбранной записи домена
 ```php
-$deleteDomainEntry = new \IspApi\Func\Domain\Record\Delete('test A  127.0.0.1', 'domain.ru');
+$deleteDomainEntry = new \IspApi\Func\Dns\Record\Delete('test A  127.0.0.1', 'domain.ru');
 ```
 
 ###### Подготовка к добавлению записи в домен 
 ```php
-$addItemToDomain = new \IspApi\Func\Domain\Record\Add('', 'domain.ru');
+$addItemToDomain = new \IspApi\Func\Dns\Record\Add('', 'domain.ru');
 $addItemToDomain->setAdditional([
     'name' => 'test1',
     'sdtype' => 'A',
@@ -78,12 +79,12 @@ $addItemToDomain->setAdditional([
 
 ###### Подготовка к получению SOA записи
 ```php
-$getSoaRecord = new \IspApi\Func\Domain\Soa\GetSoa('domain.ru');
+$getSoaRecord = new \IspApi\Func\Dns\Soa\GetSoa('domain.ru');
 ```
 
 ###### Подготовка к изменению записи SOA
 ```php
-$domainSoaEdit = new \IspApi\Func\Domain\Soa\Edit('domain.ru');
+$domainSoaEdit = new \IspApi\Func\Dns\Soa\Edit('domain.ru');
 $domainSoaEdit->setAdditional([
     'primary' => 'dns3.domain.net.',
     'email'   => 'info@domain.net',
@@ -96,12 +97,14 @@ $domainSoaEdit->setAdditional([
 ]);
 ```
 
-###### Создаем все необходимое для дальнейшего использования
+###### Создаем экземпляр IspManager и устанавливаем ранее подготовленные объелкты для дальнейшего использования
 ```php
-$ispManager = new IspApi\ispManager();
-$ispManager->setServer($server)
-    ->setUser($credentials)
-    ->setClient($client);
+$ispManager = new IspApi\IspManager();
+$response = $ispManager->setServer($server)
+    ->setCredentials($credentials)
+    ->setFunc($getDomainList)
+    ->setHttpClient($client)
+    ->setFormat($format);
 ```
 
 ###### Выполняем/Получаем
